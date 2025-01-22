@@ -2,21 +2,53 @@ const express=require('express');
 const connectDB=require('./config/database');
 const app=express();
 const User=require('./models/user');
-
+const {validateSignUpData}=require('./utils/validation');
+const bcrypt=require("bcrypt");
 // Middleware used to convert json object into js object
 app.use(express.json());
 
 //To signup
 app.post('/signup',async(req,res)=>{
-    //Creating new Instance for the user
-    const user=new User(req.body);
+    
+      
     try{
-    await user.save();
-    res.send("data saved successfully");
+        // Validation of the data
+        validateSignUpData(req.body);
+
+        const {firstName,lastName,emailId,password}=req.body;
+
+        //Encryption of the password
+        const hashedPassword=await bcrypt.hash(password,10);
+
+        //Creating new Instance for the user
+        const user=new User({firstName,lastName,emailId,password:hashedPassword});
+        await user.save();
+        res.send("data saved successfully");
     }catch(err){
         res.status(400).send("Error Saving the user: "+err.message);
     }
 });
+
+//To login
+app.post('/login',async(req,res)=>{
+    try{
+        const {emailId,password}=req.body;
+        const user=await User.findOne({emailId:emailId});
+        // console.log(user);
+        if(!user){
+             throw new Error("Invalid credentials");
+        }else{
+            const isMatch=await bcrypt.compare(password,user.password);
+            if(isMatch){
+                res.send("Login Successfull");
+            }else{
+                throw new Error("Invalid credentials");
+            }
+        }
+    }catch(err){
+        res.status(400).send("Error"+err);
+    }
+})
 
 //To get all the users
 app.get('/feed',async(req,res)=>{
